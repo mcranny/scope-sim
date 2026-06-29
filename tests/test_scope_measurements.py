@@ -17,6 +17,24 @@ class ScopeAndMeasurementTests(unittest.TestCase):
         self.assertAlmostEqual(record.trigger_index / record.samples.size, 0.25, delta=0.01)
         self.assertGreaterEqual(record.samples[record.trigger_index], 0.0)
         self.assertLess(record.samples[record.trigger_index - 1], 0.0)
+        self.assertFalse(record.metadata["trigger_fallback"])
+
+    def test_trigger_fallback_is_marked_when_no_edge_crosses(self):
+        samples = np.full(1000, 0.25)
+        record = OscilloscopeEngine(time_per_div=100e-6, trigger_level=1.0).acquire(samples, 1_000_000.0)
+
+        self.assertTrue(record.metadata["trigger_fallback"])
+
+    def test_acquisition_history_is_capped_and_clearable(self):
+        _, samples = WaveformGenerator(kind="sine", frequency=1_000, amplitude=1.0).generate(20_000, 1_000_000.0)
+        scope = OscilloscopeEngine(time_per_div=100e-6, max_history=2)
+
+        for _ in range(5):
+            scope.acquire(samples, 1_000_000.0)
+
+        self.assertEqual(len(scope.acquisitions), 2)
+        scope.clear_history()
+        self.assertEqual(scope.acquisitions, [])
 
     def test_bandwidth_validation_rolls_off_signal_above_scope_bandwidth(self):
         sample_rate = 1_000_000_000.0
@@ -102,6 +120,33 @@ class ScopeAndMeasurementTests(unittest.TestCase):
 
         self.assertGreater(settling, 0.04)
         self.assertLess(settling, 0.08)
+
+    def test_settling_time_scales_linearly_for_large_records(self):
+        sample_rate = 1_000_000.0
+        time = np.arange(300_000) / sample_rate
+        samples = np.ones_like(time)
+        samples[:250_000] = 0.0
+        record = AcquisitionRecord(samples=samples, time=time, sample_rate=sample_rate, trigger_index=0, trigger_level=0.5, trigger_edge="rising")
+
+        settling = MeasurementEngine(record).settling_time(tolerance=0.01)
+
+        self.assertAlmostEqual(settling, time[250_000])
+
+    def test_overshoot_for_positive_and_negative_steps(self):
+        sample_rate = 1_000.0
+        time = np.arange(1000) / sample_rate
+        rising = np.ones_like(time)
+        rising[:100] = 0.0
+        rising[100:200] = 1.2
+        falling = np.zeros_like(time)
+        falling[:100] = 1.0
+        falling[100:200] = -0.2
+
+        rising_record = AcquisitionRecord(rising, time, sample_rate, 100, 0.5, "rising")
+        falling_record = AcquisitionRecord(falling, time, sample_rate, 100, 0.5, "falling")
+
+        self.assertAlmostEqual(MeasurementEngine(rising_record).overshoot(), 0.2)
+        self.assertAlmostEqual(MeasurementEngine(falling_record).overshoot(), 0.2)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ A physics-oriented virtual oscilloscope and signal acquisition simulator. The pa
 
 1. Configurable waveform generation
 2. DAC gain, offset, quantization, ENOB noise, and optional nonlinearity
-3. Analog path noise, drift, attenuation, low-pass filtering, and fractional delay
+3. Analog path noise, drift, attenuation, low-pass filtering, and fractional sample delay
 4. ADC sample timing, aperture jitter, gain/offset error, quantization, and ENOB noise
 5. Oscilloscope timebase, bandwidth limiting, edge triggering, and acquisition buffers
 6. Standard oscilloscope measurements and static visualization
@@ -15,10 +15,10 @@ The simulator is intended as a technically defensible instrumentation artifact r
 
 ```bash
 python3 -m unittest discover -s tests -v
-MPLBACKEND=Agg PYTHONPATH=src python3 examples/basic_capture.py
+python3 examples/basic_capture.py
 ```
 
-The example writes `examples/basic_capture.png`.
+The example writes `examples/basic_capture.png` and requires the optional visualization dependency: `pip install ".[viz]"`.
 
 ## Minimal usage
 
@@ -44,4 +44,6 @@ print(measurements.vpp())
 
 ## Validation focus
 
-The test suite validates waveform FFT placement, DAC gain/offset behavior, analog low-pass rolloff, ADC ENOB/SNR behavior, trigger stability, sample-rate reconstruction error, bandwidth rolloff, jitter impact, and measurement accuracy.
+The test suite validates waveform FFT placement, waveform shapes, DAC gain/offset and nonlinearities, analog low-pass rolloff and impairments, ADC ENOB/SNR behavior, trigger behavior, acquisition history management, sample-rate reconstruction error, bandwidth rolloff, jitter impact, and measurement accuracy.
+
+Filtering in the analog path and oscilloscope bandwidth limiter uses zero-phase Butterworth filtering. That keeps magnitude-response validation simple, but it is not a causal analog-front-end phase model.

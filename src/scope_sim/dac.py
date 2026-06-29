@@ -57,6 +57,7 @@ class DACModel:
         if self.dnl:
             lsb = 2.0 * self.full_scale / (2**self.bits)
             codes = quantization_codes(pre_quantized, self.bits, self.full_scale)
+            # Stylized periodic code-dependent error, not a specific DAC architecture.
             values = values + self.dnl * lsb * np.sin(2.0 * np.pi * codes / 17.0)
         if self.enob is not None:
             rng = np.random.default_rng(self.seed)

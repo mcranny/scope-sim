@@ -25,6 +25,22 @@ class WaveformGeneratorTests(unittest.TestCase):
         self.assertAlmostEqual(np.max(samples), 2.0)
         self.assertAlmostEqual(np.min(samples), -2.0)
 
+    def test_triangle_and_sawtooth_ranges_are_normalized(self):
+        _, triangle = WaveformGenerator(kind="triangle", frequency=10.0).generate(1000, 1000.0)
+        _, sawtooth = WaveformGenerator(kind="sawtooth", frequency=10.0).generate(1000, 1000.0)
+
+        self.assertAlmostEqual(float(np.max(triangle)), 1.0)
+        self.assertAlmostEqual(float(np.min(triangle)), -1.0)
+        self.assertAlmostEqual(float(np.max(sawtooth)), 0.98)
+        self.assertAlmostEqual(float(np.min(sawtooth)), -1.0)
+
+    def test_pulse_waveform_is_unipolar_with_requested_duty_cycle(self):
+        _, samples = WaveformGenerator(kind="pulse", frequency=10.0, amplitude=3.0, duty_cycle=0.2).generate(1000, 1000.0)
+
+        self.assertAlmostEqual(float(np.min(samples)), 0.0)
+        self.assertAlmostEqual(float(np.max(samples)), 3.0)
+        self.assertAlmostEqual(float(np.mean(samples > 1.5)), 0.2, delta=0.01)
+
     def test_arbitrary_waveform_resamples_periodically(self):
         _, samples = WaveformGenerator(kind="arbitrary", arbitrary_samples=[0, 1, 0, -1]).generate(8, 8.0)
 

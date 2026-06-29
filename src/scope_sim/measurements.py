@@ -83,10 +83,13 @@ class MeasurementEngine:
         final = float(np.mean(samples[int(0.9 * samples.size) :]))
         band = max(abs(final) * tolerance, tolerance * max(self.vpp(), np.finfo(float).eps))
         settled = np.abs(samples - final) <= band
-        for idx in range(samples.size):
-            if np.all(settled[idx:]):
-                return float(self.record.time[idx] - self.record.time[0])
-        return float("nan")
+        outside = np.flatnonzero(~settled)
+        if outside.size == 0:
+            return 0.0
+        first_settled_index = int(outside[-1] + 1)
+        if first_settled_index >= samples.size:
+            return float("nan")
+        return float(self.record.time[first_settled_index] - self.record.time[0])
 
     def all(self) -> dict[str, float]:
         return {

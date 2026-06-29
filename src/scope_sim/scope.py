@@ -20,7 +20,11 @@ class AcquisitionRecord:
 
 @dataclass
 class OscilloscopeEngine:
-    """Simulate timebase, bandwidth limiting, edge triggering, and acquisition memory."""
+    """Simulate timebase, bandwidth limiting, edge triggering, and acquisition memory.
+
+    Bandwidth limiting uses zero-phase filtering to model magnitude rolloff
+    without introducing phase delay.
+    """
 
     time_per_div: float
     divisions: int = 10
@@ -29,7 +33,8 @@ class OscilloscopeEngine:
     pre_trigger_fraction: float = 0.5
     bandwidth_limit: float | None = None
     bandwidth_order: int = 4
-    acquisitions: list[AcquisitionRecord] = field(default_factory=list)
+    max_history: int | None = 100
+    acquisitions: list[AcquisitionRecord] = field(default_factory=list, init=False)
 
     def acquire(self, samples: np.ndarray, sample_rate: float) -> AcquisitionRecord:
         if sample_rate <= 0:
@@ -40,6 +45,8 @@ class OscilloscopeEngine:
             raise ValueError("divisions must be positive")
         if not 0.0 <= self.pre_trigger_fraction <= 1.0:
             raise ValueError("pre_trigger_fraction must be between 0 and 1")
+        if self.max_history is not None and self.max_history < 0:
+            raise ValueError("max_history must be non-negative or None")
 
         values = np.asarray(samples, dtype=float)
         if values.ndim != 1 or values.size < 2:
@@ -48,7 +55,7 @@ class OscilloscopeEngine:
             values = self._bandwidth_limit(values, sample_rate)
 
         window_samples = max(2, int(round(self.time_per_div * self.divisions * sample_rate)))
-        trigger_index = self._find_trigger(values)
+        trigger_index, trigger_fallback = self._find_trigger(values)
         pre_samples = int(round(window_samples * self.pre_trigger_fraction))
         start = trigger_index - pre_samples
         end = start + window_samples
@@ -75,12 +82,19 @@ class OscilloscopeEngine:
                 "time_per_div": self.time_per_div,
                 "divisions": self.divisions,
                 "bandwidth_limit": self.bandwidth_limit,
+                "trigger_fallback": trigger_fallback,
             },
         )
-        self.acquisitions.append(record)
+        if self.max_history != 0:
+            self.acquisitions.append(record)
+            if self.max_history is not None and len(self.acquisitions) > self.max_history:
+                del self.acquisitions[: len(self.acquisitions) - self.max_history]
         return record
 
-    def _find_trigger(self, values: np.ndarray) -> int:
+    def clear_history(self) -> None:
+        self.acquisitions.clear()
+
+    def _find_trigger(self, values: np.ndarray) -> tuple[int, bool]:
         edge = self.trigger_edge.lower()
         previous = values[:-1]
         current = values[1:]
@@ -91,8 +105,8 @@ class OscilloscopeEngine:
         else:
             raise ValueError("trigger_edge must be 'rising' or 'falling'")
         if crossings.size == 0:
-            return int(np.argmin(np.abs(values - self.trigger_level)))
-        return int(crossings[0] + 1)
+            return int(np.argmin(np.abs(values - self.trigger_level))), True
+        return int(crossings[0] + 1), False
 
     def _bandwidth_limit(self, values: np.ndarray, sample_rate: float) -> np.ndarray:
         nyquist = sample_rate / 2.0
