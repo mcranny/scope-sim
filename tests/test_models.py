@@ -21,6 +21,16 @@ class ModelTests(unittest.TestCase):
 
         self.assertAlmostEqual(float(np.mean(output)), 1.25 * 1.002 + 0.003, delta=2e-4)
 
+    def test_dac_dnl_perturbs_quantization_codes_within_lsb_scale(self):
+        samples = np.linspace(-0.9, 0.9, 1000)
+        ideal = DACModel(bits=8, full_scale=1.0, dnl=0.0).convert(samples)
+        nonlinear = DACModel(bits=8, full_scale=1.0, dnl=0.5).convert(samples)
+
+        delta = nonlinear - ideal
+        lsb = 2.0 / (2**8)
+        self.assertGreater(float(np.std(delta)), lsb * 0.1)
+        self.assertLessEqual(float(np.max(np.abs(delta))), lsb * 0.5 + 1e-12)
+
     def test_analog_lowpass_rolls_off_above_cutoff(self):
         sample_rate = 1_000_000.0
         duration = 0.05
