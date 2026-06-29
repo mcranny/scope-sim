@@ -39,7 +39,13 @@ class ADCModel:
             raise ValueError("sample_rate must be positive")
 
         start = analog_time[0]
-        stop = analog_time[-1] if duration is None else start + duration
+        if duration is None:
+            input_step = float(np.median(np.diff(analog_time)))
+            if input_step <= 0:
+                raise ValueError("analog_time must be strictly increasing")
+            stop = analog_time[-1] + input_step
+        else:
+            stop = start + duration
         n_samples = int(np.floor((stop - start) * self.sample_rate))
         if n_samples <= 1:
             raise ValueError("duration is too short for the ADC sample rate")

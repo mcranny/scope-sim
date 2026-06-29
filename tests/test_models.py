@@ -53,6 +53,29 @@ class ModelTests(unittest.TestCase):
         self.assertGreater(snr, expected - 8.0)
         self.assertLess(snr, expected + 5.0)
 
+    def test_adc_preserves_equal_rate_sample_count_when_duration_is_omitted(self):
+        sample_rate = 1_000.0
+        analog_time = np.arange(100) / sample_rate
+        analog_samples = np.linspace(-1.0, 1.0, 100)
+
+        adc_time, adc_samples = ADCModel(sample_rate=sample_rate, bits=16, full_scale=2.0).convert(analog_time, analog_samples)
+
+        self.assertEqual(adc_time.size, analog_time.size)
+        self.assertEqual(adc_samples.size, analog_samples.size)
+
+    def test_adc_explicit_duration_keeps_half_open_sampling_window(self):
+        sample_rate = 1_000.0
+        analog_time = np.arange(100) / sample_rate
+        analog_samples = np.linspace(-1.0, 1.0, 100)
+
+        adc_time, _ = ADCModel(sample_rate=sample_rate, bits=16, full_scale=2.0).convert(
+            analog_time,
+            analog_samples,
+            duration=0.050,
+        )
+
+        self.assertEqual(adc_time.size, 50)
+
     def test_adc_jitter_increases_high_frequency_error(self):
         analog_rate = 20_000_000.0
         adc_rate = 2_000_000.0
