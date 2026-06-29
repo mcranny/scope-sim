@@ -31,6 +31,15 @@ class ModelTests(unittest.TestCase):
         self.assertGreater(float(np.std(delta)), lsb * 0.1)
         self.assertLessEqual(float(np.max(np.abs(delta))), lsb * 0.5 + 1e-12)
 
+    def test_dac_inl_adds_bounded_integral_nonlinearity(self):
+        samples = np.linspace(-0.8, 0.8, 1000)
+        ideal = DACModel(bits=12, full_scale=1.0, inl=0.0).convert(samples)
+        nonlinear = DACModel(bits=12, full_scale=1.0, inl=0.01).convert(samples)
+
+        delta = nonlinear - ideal
+        self.assertGreater(float(np.max(np.abs(delta))), 0.005)
+        self.assertLessEqual(float(np.max(np.abs(delta))), 0.01 + 1e-12)
+
     def test_analog_lowpass_rolls_off_above_cutoff(self):
         sample_rate = 1_000_000.0
         duration = 0.05
@@ -45,6 +54,29 @@ class ModelTests(unittest.TestCase):
         high_amp = fft_amplitude(filtered, sample_rate, 200_000)
         self.assertGreater(low_amp, 0.85)
         self.assertLess(high_amp, 0.08)
+
+    def test_analog_noise_attenuation_and_delay_are_applied(self):
+        samples = np.zeros(2000)
+        samples[1000:] = 1.0
+        clean = AnalogPath(sample_rate=1_000.0, cable_attenuation=0.5, delay_samples=2.5).process(samples)
+        noisy = AnalogPath(sample_rate=1_000.0, gaussian_noise_std=0.1, seed=123).process(np.zeros(2000))
+
+        self.assertAlmostEqual(float(clean[-1]), 0.5)
+        self.assertAlmostEqual(float(clean[1000]), 0.0)
+        self.assertAlmostEqual(float(clean[1002]), 0.25)
+        self.assertGreater(float(np.std(noisy)), 0.09)
+        self.assertLess(float(np.std(noisy)), 0.11)
+
+    def test_analog_thermal_drift_and_gain_variation_are_deterministic_with_seed(self):
+        samples = np.ones(5000)
+        path = AnalogPath(sample_rate=1_000.0, thermal_drift_std=0.01, gain_variation_std=0.01, seed=7)
+        repeat = AnalogPath(sample_rate=1_000.0, thermal_drift_std=0.01, gain_variation_std=0.01, seed=7)
+
+        first = path.process(samples)
+        second = repeat.process(samples)
+
+        np.testing.assert_allclose(first, second)
+        self.assertGreater(float(np.ptp(first)), 0.01)
 
     def test_adc_snr_is_consistent_with_enob(self):
         analog_rate = 5_000_000.0

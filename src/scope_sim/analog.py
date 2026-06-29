@@ -8,7 +8,11 @@ from scipy import signal
 
 @dataclass
 class AnalogPath:
-    """Apply analog impairments before digitization."""
+    """Apply analog impairments before digitization.
+
+    Low-pass filtering uses zero-phase filtering to model magnitude rolloff
+    without adding causal phase delay.
+    """
 
     sample_rate: float
     gaussian_noise_std: float = 0.0
@@ -17,7 +21,7 @@ class AnalogPath:
     cable_attenuation: float = 1.0
     lowpass_cutoff: float | None = None
     lowpass_order: int = 4
-    delay: float = 0.0
+    delay_samples: float = 0.0
     seed: int | None = None
 
     def process(self, samples: np.ndarray) -> np.ndarray:
@@ -43,8 +47,8 @@ class AnalogPath:
         if self.lowpass_cutoff is not None:
             values = self._lowpass(values)
 
-        if self.delay:
-            values = self._fractional_delay(values, self.delay)
+        if self.delay_samples:
+            values = self._fractional_delay(values, self.delay_samples)
 
         return values
 
