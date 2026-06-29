@@ -16,6 +16,7 @@ The simulator is intended as a technically defensible instrumentation artifact r
 ```bash
 python3 -m unittest discover -s tests -v
 python3 examples/basic_capture.py
+PYTHONPATH=src python3 -m scope_sim.viewer
 ```
 
 The example writes `examples/basic_capture.png` and requires the optional visualization dependency: `pip install ".[viz]"`.
@@ -41,6 +42,14 @@ measurements = MeasurementEngine(record)
 print(measurements.frequency())
 print(measurements.vpp())
 ```
+
+## Interactive Viewer
+
+```bash
+PYTHONPATH=src python3 -m scope_sim.viewer --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000` to adjust waveform, converter, analog-path, and scope parameters in the browser.
 
 ## Validation focus
 
