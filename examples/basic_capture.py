@@ -1,6 +1,10 @@
+import os
 from pathlib import Path
 import sys
+import tempfile
 
+os.environ.setdefault("MPLBACKEND", "Agg")
+os.environ.setdefault("MPLCONFIGDIR", str(Path(tempfile.gettempdir()) / "scope_sim_matplotlib"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from scope_sim import ADCModel, AnalogPath, DACModel, MeasurementEngine, OscilloscopeEngine, WaveformGenerator, plot_acquisition
