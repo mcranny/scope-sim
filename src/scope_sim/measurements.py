@@ -27,7 +27,8 @@ class MeasurementEngine:
         samples = self.record.samples - np.mean(self.record.samples)
         if np.allclose(samples, 0.0):
             return float("nan")
-        crossings = self._rising_crossing_times(np.mean(self.record.samples))
+        threshold = float(np.mean(self.record.samples))
+        crossings = self._hysteretic_rising_crossing_times(threshold)
         if crossings.size >= 2:
             periods = np.diff(crossings)
             periods = periods[periods > 0]
@@ -117,6 +118,38 @@ class MeasurementEngine:
             times.append(float(self.record.time[i] + frac * (self.record.time[i + 1] - self.record.time[i])))
         return np.asarray(times)
 
+    def _hysteretic_rising_crossing_times(self, threshold: float) -> np.ndarray:
+        samples = self.record.samples
+        hysteresis = self._crossing_hysteresis()
+        lower = threshold - hysteresis
+        upper = threshold + hysteresis
+        armed = bool(samples[0] <= lower)
+        times: list[float] = []
+
+        for idx in range(1, samples.size):
+            previous = samples[idx - 1]
+            current = samples[idx]
+            if not armed:
+                if current <= lower:
+                    armed = True
+                continue
+            if previous < upper <= current:
+                times.append(self._interpolated_crossing_time(idx - 1, upper))
+                armed = False
+
+        return np.asarray(times)
+
+    def _crossing_hysteresis(self) -> float:
+        samples = self.record.samples
+        span = self.vpp()
+        if np.isclose(span, 0.0):
+            return 0.0
+        diffs = np.diff(samples)
+        if diffs.size == 0:
+            return 0.01 * span
+        noise_std = float(np.median(np.abs(diffs - np.median(diffs))) / (0.6745 * np.sqrt(2.0)))
+        return float(min(0.25 * span, max(0.01 * span, 6.0 * noise_std)))
+
     def _ten_ninety_levels(self) -> tuple[float, float]:
         samples = self.record.samples
         low = float(np.min(samples) + 0.1 * self.vpp())
@@ -142,6 +175,9 @@ class MeasurementEngine:
         return float(stop_time - start_time)
 
     def _crossing_time(self, index: int, threshold: float) -> float:
+        return self._interpolated_crossing_time(index, threshold)
+
+    def _interpolated_crossing_time(self, index: int, threshold: float) -> float:
         samples = self.record.samples
         dv = samples[index + 1] - samples[index]
         frac = 0.0 if np.isclose(dv, 0.0) else (threshold - samples[index]) / dv

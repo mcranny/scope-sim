@@ -77,6 +77,15 @@ class ScopeAndMeasurementTests(unittest.TestCase):
         self.assertAlmostEqual(measurements.duty_cycle(), 0.5, delta=0.01)
         self.assertAlmostEqual(measurements.rms(), 0.5, delta=0.01)
 
+    def test_frequency_rejects_noisy_threshold_chatter(self):
+        sample_rate = 10_000.0
+        time = np.arange(int(3.0 * sample_rate)) / sample_rate
+        rng = np.random.default_rng(12)
+        samples = np.sin(2.0 * np.pi * 1.0 * time) + rng.normal(0.0, 0.003, size=time.shape)
+        record = AcquisitionRecord(samples, time, sample_rate, 0, 0.0, "rising")
+
+        self.assertAlmostEqual(MeasurementEngine(record).frequency(), 1.0, delta=0.01)
+
     def test_noisy_trigger_stability_over_multiple_acquisitions(self):
         sample_rate = 2_000_000.0
         _, clean = WaveformGenerator(kind="sine", frequency=10_000, amplitude=1.0).generate(20_000, sample_rate)
